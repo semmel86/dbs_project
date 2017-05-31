@@ -22,7 +22,7 @@ public class TestConnection {
 			
 			PreparedStatement st = connection.prepareStatement("SELECT * FROM twitteraccount WHERE handle like 'HillaryClinton';");
 			
-			ResultSet rs = st..executeQuery();
+			ResultSet rs = st.executeQuery();
 			while (rs.next())
 			{
 //				System.out.println(rs.);

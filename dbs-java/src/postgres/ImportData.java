@@ -1,14 +1,8 @@
 package postgres;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -17,71 +11,153 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 
+/**
+ * @author semmel
+ *
+ */
+/**
+ * @author semmel
+ *
+ */
+/**
+ * @author semmel
+ *
+ */
 public class ImportData {
 
-	private static PostgresConnector pc = new PostgresConnector();
+	private static PostgresConnector pc = new PostgresConnector("election", "elect2016", "178.254.35.26", "Election");
 	private static Connection connection;
+	private static String separator;
 
 	public static void main(String[] argv) throws SQLException, IOException {
 
 		File csvBaseFile = new File("C:\\Users\\semmel\\Documents\\DBS\\Projekt\\american-election-tweets.csv");
+		// set the specific separator
+		separator = ";";
 
-		// clean the dirty file
+		// clean the dirty file with the cleanUpCSV() method
 		cleanUpCSV("C:\\Users\\semmel\\Documents\\DBS\\Projekt\\american-election-tweets.csv");
+
+		// get the connection for import
 		connection = pc.getConnection();
 
-		Scanner scanner = new Scanner(csvBaseFile);
+		// read all lines and import all valid lines to the database
+		readAndImportCsv(csvBaseFile);
+
+	}
+
+	/**
+	 * Count all occurrences of the separator in the line
+	 * 
+	 * @param String
+	 *            line
+	 * @return int count
+	 */
+	private static int columnCount(String line) {
+		int count = 0;
+		while (line.contains(separator)) {
+			if (line.indexOf(separator) == -1)
+				break;
+
+			line = line.substring(line.indexOf(separator) + 1);
+			// System.out.println(line.indexOf(seperator)+","+line);
+			count++;
+			// System.out.println(count);
+		}
+		return count;
+	}
+
+	/**
+	 * Returns the first field as String
+	 * 
+	 * @param line
+	 * @return String field
+	 */
+	private static String getNextField(String line) {
+		String field = line.substring(0, line.indexOf(separator));
+		line = line.substring(line.indexOf(";") + 1, line.length());
+		return field;
+	}
+
+	/**
+	 * Returns the Line without the first field
+	 * 
+	 * @param line
+	 * @return String line
+	 */
+	private static String getNext(String line) {
+		return line.substring(line.indexOf(separator) + 1, line.length());
+	}
+
+	/**
+	 * Iterates over all lines, validate them and imports every valid row into
+	 * the connected Database
+	 * 
+	 * @param file
+	 * @throws FileNotFoundException
+	 */
+	private static void readAndImportCsv(File file) throws FileNotFoundException {
+
+		// use a simple scanner to read the lines, alternatively a
+		// BufferedReader(FileReader) could be used
+		Scanner scanner = new Scanner(file);
+		// read while there are lines in the file
+		int linecount=0;
 		while (scanner.hasNext()) {
 			String currentLine = scanner.nextLine();
+			linecount++;
 			try {
-				// System.out.println(currentLine);
-				if (currentLine.contains(";")) {
+				// check if its a valid csv line, separated by ";" with the
+				// specific row count
+				if (columnCount(currentLine) == 10) {
 
-					String handle = currentLine.substring(0, currentLine.indexOf(";"));
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
-//					System.out.print("Handle: " + handle + "\t");
+					// get the handle from first field
+					String handle = getNextField(currentLine);
+					currentLine = getNext(currentLine);
+					// get text from second field
+					String text = getNextField(currentLine);
+					// trim "
+					text = text.replaceAll("\"", "");
 
-					// Insert Handle
-
-					String text = currentLine.substring(0, currentLine.indexOf(";")).replaceAll("\"", "");
-//					System.out.print("\tText: " + text);
+					// extract all hashtags
 					List<String> hashtags = getHashtags(text);
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
 
-					//2016-01-06T02:33:40
-					String dateStr = currentLine.substring(0, currentLine.indexOf("T"));
-//					System.out.print("\tDate: " + dateStr);
-					Date date = Date.valueOf(dateStr);
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
+					// jump over the next three columns
+					currentLine = getNext(currentLine);
+					currentLine = getNext(currentLine);
+					currentLine = getNext(currentLine);
 
-					String retweet_count = currentLine.substring(0, currentLine.indexOf(";"));
-//					System.out.print("\tRetweets: " + retweet_count);
-					currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
+					// get the datestring from filed five
+					String dateStr = getNextField(currentLine);
 
-					String favorite_count = currentLine.substring(0, currentLine.indexOf(";"));
-//					System.out.print("\tFavorites: " + favorite_count + "\n");
-					// favorite_count
-					// retweet_count
+					Date date = Date.valueOf(dateStr.substring(0, currentLine.indexOf("T")));
 
-					// hashtags
+					// jump over to field eight
+					currentLine = getNext(currentLine);
+					currentLine = getNext(currentLine);
+					currentLine = getNext(currentLine);
 
-					// persist cuurentLine
+					// read the retweetcount from field eight
+					String retweet_count = getNextField(currentLine);
+
+					// read the favorite count from field nine
+					currentLine = getNext(currentLine);
+					String favorite_count = getNextField(currentLine);
+					
+					// import to the database
 					persistIntoDb(handle, text, date, Integer.parseInt(retweet_count), Integer.parseInt(favorite_count),
 							hashtags);
+					System.out.println(linecount);
 				} else {
-					System.out.println("There is no comma-separated line");
+					// Oh, line not valid, but we throw no exception, to avoid
+					// breaking the import
+					System.out.println("Skipped unvalid line "+linecount);
 				}
-			} catch (Exception e) {
+			} catch (IllegalArgumentException e) {
+				// Not good, the date parsing fails, which means that the line
+				// was not imported, but the import continues
 				e.printStackTrace();
 			}
 
@@ -89,134 +165,146 @@ public class ImportData {
 		scanner.close();
 	}
 
+	/**
+	 * Import the contents to the database.
+	 * 
+	 * @param handle
+	 * @param text
+	 * @param date
+	 * @param retweet_count
+	 * @param favorite_count
+	 * @param hashtags
+	 */
 	private static void persistIntoDb(String handle, String text, Date date, int retweet_count, int favorite_count,
 			List<String> hashtags) {
 		try {
 			if (connection != null) {
-				
-				// handle
+
+				// Check if the handle exists
 				PreparedStatement accountId = connection
 						.prepareStatement("SELECT * FROM twitteraccount WHERE handle = ?  ;");
 				accountId.setString(1, handle);
-				
+
 				ResultSet rs = accountId.executeQuery();
-				
-				if (!rs.next()) {// new handle // insert handle
-					System.out.println("New Handle");
+
+				if (!rs.next()) {// it's a new handle -> insert handle
+					
 					PreparedStatement insert = connection
 							.prepareStatement("INSERT INTO twitteraccount (handle) VALUES  (?);");
 					insert.setString(1, handle);
 					insert.execute();
-						rs = accountId.executeQuery();
-					
+					System.out.println("New Handle " + handle +" inserted");
+					rs = accountId.executeQuery();
+
 				}
+				// get the ID!
 				int account_id = rs.getInt(1);
-//				System.out.println("AccountId: " + account_id + " for handle: " + handle);
-				
-				// tweet
-				PreparedStatement tweetId = connection
-						.prepareStatement("SELECT * FROM tweet WHERE contenttext = ?  ;");
+
+				// Check if the tweet exists
+				PreparedStatement tweetId = connection.prepareStatement("SELECT * FROM tweet WHERE contenttext = ?  ;");
 				tweetId.setString(1, text);
 				rs = tweetId.executeQuery();
-				
-				if (!rs.next()) {// new text 
-					System.out.println("New Text");
-					PreparedStatement insert = connection
-							.prepareStatement("INSERT INTO tweet (tweetdate,contenttext,favorite_count,retweet_count) VALUES  (?,?,?,?);");
+
+				if (!rs.next()) {// it's a new tweet -> insert tweet
+					
+					PreparedStatement insert = connection.prepareStatement(
+							"INSERT INTO tweet (tweetdate,contenttext,favorite_count,retweet_count) VALUES  (?,?,?,?);");
 					insert.setDate(1, date);
 					insert.setString(2, text);
 					insert.setInt(3, favorite_count);
 					insert.setInt(4, retweet_count);
-
 					insert.execute();
+					System.out.println("New Tweet " + text + " inserted");
 					rs = tweetId.executeQuery();
-					rs.next();//set position of rs
+					rs.next();// set position of rs
 				}
+				// get the ID
 				int tweet_Id = rs.getInt(1);
-				System.out.println("TweetId: "+tweet_Id);
-				// select tweetId
-				// insert hashtags
-				
-				for(String tag:hashtags){
-				PreparedStatement hashTagId = connection
-						.prepareStatement("SELECT * FROM hashtag WHERE hashtag = ?  ;");
-				hashTagId.setString(1, tag);
-				rs = hashTagId.executeQuery();
-				
-				if (!rs.next()) {// new tag
-					System.out.println("New Tag");
-					PreparedStatement insert = connection
-							.prepareStatement("INSERT INTO hashtag (hashtag) VALUES  (?);");
-					insert.setString(1, tag);
-					insert.execute();
-					rs = hashTagId.executeQuery();
-					rs.next();
-				}
+//				System.out.println("TweetId: " + tweet_Id);
 
-				int hashTag_Id=rs.getInt(1);
-				System.out.println("HASHtagId: "+rs.getInt(1));
-				
-				PreparedStatement tweetToTextId = connection
-						.prepareStatement("SELECT * FROM tweet_belongs_to_hashtags WHERE hashtagid = ? AND tweetid = ?  ;");
-				tweetToTextId.setInt(1,hashTag_Id);
-				tweetToTextId.setInt(2, tweet_Id);
-				rs = tweetToTextId.executeQuery();
-				
-				if (!rs.next()) {// new tagToText Relation
-					System.out.println("New Tag to Text Relation");
-					PreparedStatement insert = connection
-							.prepareStatement("INSERT INTO tweet_belongs_to_hashtags (hashtagid,tweetid) VALUES  (?,?);");
-					insert.setInt(1,hashTag_Id);
-					insert.setInt(2, tweet_Id);
-					insert.execute();
-					
+				for (String tag : hashtags) {
+
+					// check if the tag exists
+					PreparedStatement hashTagId = connection
+							.prepareStatement("SELECT * FROM hashtag WHERE hashtag = ?  ;");
+					hashTagId.setString(1, tag);
+					rs = hashTagId.executeQuery();
+
+					if (!rs.next()) {// it's a new tag -> insert tag
+
+						PreparedStatement insert = connection
+								.prepareStatement("INSERT INTO hashtag (hashtag) VALUES  (?);");
+						insert.setString(1, tag);
+						insert.execute();
+						rs = hashTagId.executeQuery();
+						System.out.println("New Hashtag " + tag + " inserted");
+						rs.next();
+					}
+					// get the ID
+					int hashTag_Id = rs.getInt(1);
+
+					// Check if the relation Hashtag to Tweet exists
+					PreparedStatement tweetToTextId = connection.prepareStatement(
+							"SELECT * FROM tweet_belongs_to_hashtags WHERE hashtagid = ? AND tweetid = ?  ;");
+					tweetToTextId.setInt(1, hashTag_Id);
+					tweetToTextId.setInt(2, tweet_Id);
+					rs = tweetToTextId.executeQuery();
+
+					if (!rs.next()) {// new tagToTweett Relation
+						System.out.println("New Tag to Text Relation");
+						PreparedStatement insert = connection.prepareStatement(
+								"INSERT INTO tweet_belongs_to_hashtags (hashtagid,tweetid) VALUES  (?,?);");
+						insert.setInt(1, hashTag_Id);
+						insert.setInt(2, tweet_Id);
+						insert.execute();
+						System.out.println("New Tag to Text Relations inserted");
+
+					}
+
 				}
-				
-				}
-				
+				// Check if the relation Account to Tweet exists
 				PreparedStatement accountToTweetId = connection
 						.prepareStatement("SELECT * FROM account_tweets WHERE accountid = ? AND tweetid = ?  ;");
-				accountToTweetId.setInt(1,account_id);
+				accountToTweetId.setInt(1, account_id);
 				accountToTweetId.setInt(2, tweet_Id);
 				rs = accountToTweetId.executeQuery();
-				
-				if (!rs.next()) {// new AccountToTweet Relation
-					System.out.println("New Account to Tweet Relation");
+
+				if (!rs.next()) {// new AccountToTweet Relation-> insert
+					
 					PreparedStatement insert = connection
 							.prepareStatement("INSERT INTO account_tweets (accountid,tweetid) VALUES  (?,?);");
-					insert.setInt(1,account_id);
+					insert.setInt(1, account_id);
 					insert.setInt(2, tweet_Id);
 					insert.execute();
-					
+					System.out.println("New Account to Tweet Relation inserted");
+
 				}
-				// select Id's
-				// insert account_tweet(accountId,tweetId)
-				
-				// insert hashtag_text(hashtagId,tweetId
-				// add to 
-				
+
 			} else {
 				System.out.println("No connection!");
 			}
-		} catch (Exception e) {
+		} catch (SQLException e) {
+			// ups, ...
 			e.printStackTrace();
 		}
-		
 
 	}
 
+	/**
+	 * Extracts all Hashtags from the given text
+	 * 
+	 * @param text
+	 * @return List<String> of Hashtags
+	 */
 	private static List<String> getHashtags(String text) {
 		List<String> hashtags = new ArrayList<String>();
 
 		while (text.contains("#")) {
-			// get the String after # until " "		
-			int startHashtag=text.indexOf("#");
-			int endHashtag=text.indexOf(" ", text.indexOf("#")) > 0 ? text.indexOf(" ", text.indexOf("#")):text.length();
-			System.out.println("Text:"+text);
-			System.out.println("start:"+startHashtag);
-			System.out.println("end:"+endHashtag);
-			String tag = text.substring(startHashtag,endHashtag);
-			System.out.println("Tag: " + tag);
+			// get the String after # until " "
+			int startHashtag = text.indexOf("#");
+			int endHashtag = text.indexOf(" ", text.indexOf("#")) > 0 ? text.indexOf(" ", text.indexOf("#"))
+					: text.length();
+			String tag = text.substring(startHashtag, endHashtag);
 			if (tag.length() > 1)
 				hashtags.add(tag); // avoid empty hashtags
 			text = text.substring(endHashtag, text.length());
@@ -224,39 +312,27 @@ public class ImportData {
 		return hashtags;
 	}
 
+	/**
+	 * cleans the text file under given path to enable reading by line (1)
+	 * Remove all hard spaces (2) Remove all single <LF>
+	 * 
+	 * @param path
+	 * @throws IOException
+	 */
 	private static void cleanUpCSV(String path) throws IOException {
 		File file = new File(path);
-		String str = FileUtils.readFileToString(file);// new
-														// String(Files.readAllBytes(file.toPath()));
+		// read in File to String
+		String str = FileUtils.readFileToString(file);
+
 		// remove hard spaces
 		str = str.replaceAll(".co/ZHMKIqnUwL ", "");
 		// remove single <LF>
 		str = str.replaceAll("\r\n", "CARIA" + "GERETURN_AND_LINE");
 		str = str.replaceAll("(\\n)", "");
 		str = str.replaceAll("CARIAGERETURN_AND_LINE", "\r\n");
-		// System.out.println(str);
+		// write String to File
 		FileUtils.writeStringToFile(file, str);
 
 	}
 
-	private String[][] readCSV(String path) throws IOException {
-		// read in csv Line by Line
-		File csvBaseFile = new File(path);
-		BufferedReader br = new BufferedReader(new FileReader(csvBaseFile));
-
-		while (br.ready()) {
-			String currentLine = br.readLine();
-			System.out.println(currentLine);
-			if (currentLine.contains(";")) {
-				String handle = currentLine.substring(0, currentLine.indexOf(";"));
-				currentLine = currentLine.substring(currentLine.indexOf(";") + 1, currentLine.length());
-
-				System.out.println(currentLine);
-				System.out.println(handle);
-			} else {
-				System.out.println("There is no comma-separated line");
-			}
-		}
-		return null;
-	}
 }
