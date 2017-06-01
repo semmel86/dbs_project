@@ -1,3 +1,7 @@
+--DROP TABLE contains;
+--DROP TABLE hashtag_table;
+--DROP TABLE tweet;
+
 CREATE TABLE 
 tweet (
     tweet_id integer PRIMARY KEY,
@@ -24,5 +28,5 @@ CREATE TABLE hashtag_table (
     
 CREATE TABLE contains (
     tweet_id integer REFERENCES tweet (tweet_id),
-    hashtag text REFERENCES hashtag_table (hashtag)
+    hashtag text REFERENCES hashtag_tableac (hashtag)
     )
