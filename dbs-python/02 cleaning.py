@@ -1,44 +1,46 @@
+import psycopg2.extras
 import csv
-from time import strptime
+import re
 
-with open('data.csv') as f:
+# Try to connect
+try:
+    conn = psycopg2.connect("dbname='Election' user='postgres' host='localhost' password='123'")
+except:
+    print ("Cannot Connect!")
+
+# get cursor and proceed query
+cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+with open('cleaned_data.csv') as f:
     reader = list(csv.reader(f, delimiter=";"))
 
-cleaned = []
-adjusted = 0
+
+# insert data into tweet
+tweet_id = 0
+for row in reader:
+    tweet_id += 1
+    cur.execute(""" INSERT INTO tweet
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""" , (tweet_id,row[0],row[1],row[2],row[3], row[4], row[5], row[6], row[7]))
+            # id, handle, text, is_retweet, original_author, time, is_quote_status, retweet_count, favorite_count
 
 
-for row in reader[1:]:
-    #check if handle, text, is_retweet, time, is_quote_status, retweet_count, favourite_count are null
-    if not (row[0] and row[1] and row[2] and row[4] and row[6] and row[7] and row[8]):
-        continue
+#extract hashtags from text and insert them into hashtag_table and contains
+hashtag_list=[]
+tweet_id=0
 
-    #check if is_retweet==true but no original author or vice versa
-    if row[2] == "True" and not row[3] or row[2] == "False" and row[3]:
-        continue
+for row in reader:
+    tweet_id+=1
+    #extract hashtags from text
+    hashtags_per_tweet = re.findall('#[A-Za-z0-9]+',row[1])
 
-    #check if all dates have the same format
-    try:
-        strptime(row[4], "%Y-%m-%dT%H:%M:%S")
-    except:
-        continue
+    #insert all unique hashtags into hashtag_table
+    for hashtag in hashtags_per_tweet:
+        if hashtag not in hashtag_list:
+            hashtag_list.append(hashtag)
+            cur.execute("""INSERT INTO hashtag_table VALUES ('%s')""" % (hashtag))
 
-    #count how many texts are adjusted
-    if '\n' in row[1] or '""' in row[1]:
-        adjusted +=1
+        #insert all hashtags and respective tweet_ids into contains
+        cur.execute("""INSERT INTO contains VALUES (%s, %s)""" , (tweet_id, hashtag))
 
-    #replace paragraph with space and ""
-    row[1] = row[1].replace("\n"," ")
-    row[1] = row[1].replace('""',"")
+conn.commit()
 
-
-
-    # handle, text, is_retweet, original_author, time, is_quote_status, retweet_count, favorite_count
-    cleaned.append([row[0], row[1], row[2], row[3], row[4], row[6], row[7], row[8]])
-
-with open('cleaned_data.csv', "w", newline='') as f:
-    writer = csv.writer(f, delimiter=";", quoting=csv.QUOTE_ALL)
-    writer.writerows(cleaned)
-
-print('adjusted: '+str(adjusted))
-print ('deleted: '+str(len(reader)-len(cleaned)-1))
