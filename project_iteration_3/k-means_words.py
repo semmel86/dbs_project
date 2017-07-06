@@ -30,11 +30,13 @@ def koordX(string):
     for c in string:
         result+=ord(c)
     result+=random.randint(-250*math.floor(math.log(result)),250*math.floor(math.log(result)))
+    result=distance.levenshtein(string, "#trump2016")*100+random.randint(-200,200)
     return result
 
 def koordY(string):
     l=len(string)
     y=l*100+random.randint(-200,200)
+    result=distance.levenshtein(string, "#trump2016")*100+random.randint(-200,200)
     return y
 
 # Try to connect
@@ -64,7 +66,7 @@ for row in rows:
     
 try:   
     cur.execute("""Select c2.hashtag, contains.hashtag FROM contains 
-Join contains as c2 ON contains.hashtag<>c2.hashtag AND c2.tweet_id=contains.tweet_id""")
+Join contains as c2 ON contains.hashtag<>c2.hashtag AND c2.tweet_id=contains.tweet_id ORDER BY c2.hashtag""")
 
 except:
     print ("I cannot SELECT anything from contains")
@@ -123,59 +125,61 @@ for i in range(len(cluster)):
  
 
 allEdges=[]
-# use dictionary for the Nodes and Edges
-def getNode(hashtag,color):
-    # TODO add meaningful coordinates
-    #x=random.randint(0, 500)
-    #y=random.randint(0, 500)
-    x=koordX(hashtag)
-    y=koordY(hashtag)
-    node={"id":nodesDict[hashtag][1],"label":hashtag,"x":x,"y":y,"size":(2000*nodesDict[hashtag][0]),"color":color}
-    return node
-def getEdge(id,src,tar):
-    edge={"id":id,"source":src,"target":tar}
-    return edge
-def getEdgesForNode(hashtag,num,edgeId):
-
-
-    
-    for k in range(len(hashtagpairs)):
-        allEdges.append(getEdge(k,nodesDict[hashtagpairs[k][0]][1],nodesDict[hashtagpairs[k][1]][1]))
-      
-    print(str(allEdges))
-    #edges=[]#[(id,distance),..]
-    #for node in nodesDict:
-    #    edges.append((nodesDict[node][1],dist(nodesDict[node][2],hashtag)))
-        
-    #sort by distance
-    #sortedNodes=sorted(edges, key=lambda x: x[1])
-    #for i in range(num):
-    #     allEdges.append(getEdge(edgeId,nodesDict[hashtag][1],sortedNodes[i+1][0],))
-    #     edgeId+=1
-    return 0
-
-# iterate over the cluster
-id=1
-allNodes=[]
-edgeId=0
-for i in range(len(cluster)):
-        currCluster=cluster[i]
-        
+def getColor():
         # set cluster color
         r=random.randint(25, 255)
         g=random.randint(25, 255)
         b=random.randint(25, 255)
         color ="rgb("+str(r)+","+str(g)+","+str(b)+")"
+        return color
+# use dictionary for the Nodes and Edges
+def getNode(hashtag,color):
+    # TODO add meaningful coordinates
+    x=koordX(hashtag)
+    y=koordY(hashtag)
+    node={"id":nodesDict[hashtag][1],"label":hashtag,"x":x,"y":y,"size":(2000*nodesDict[hashtag][0]),"color":color}
+    return node
+def getEdge(id,src,tar,color="rgb(199,199,199)"):
+    edge={"id":id,"source":src,"target":tar,"color":color}
+    return edge
+def getEdgesForNode(hashtag,num,edgeId,color):
+
+   # for k in range(len(hashtagpairs)):     
+   #     allEdges.append(getEdge(k,nodesDict[hashtagpairs[k][0]][1],nodesDict[hashtagpairs[k][1]][1]))
+        
+   # print(str(allEdges))
+    edges=[]#[(id,distance),..]
+    for node in nodesDict:
+        edges.append((nodesDict[node][1],dist(nodesDict[node][2],hashtag)))
+        
+    #sort by distance
+    sortedNodes=sorted(edges, key=lambda x: x[1])
+    for i in range(num):
+         allEdges.append(getEdge(edgeId,nodesDict[hashtag][1],sortedNodes[i+1][0],color))
+         edgeId+=1
+    return edgeId
+
+# iterate over the cluster
+id=1
+allNodes=[]
+edgeId=1
+color ="rgb(199,199,199)"
+for i in range(len(cluster)):
+        currCluster=cluster[i]
+        
+        
         
         print("color "+color)
+        color=getColor()
         # add node to All Nodes
         for j in range(len(currCluster)): 
             hashtag=currCluster[j];
             allNodes.append(getNode(hashtag,color))
             
             #add Edges to Edges
-        #    edgeId= getEdgesForNode(hashtag,2,edgeId)
-edgeId= getEdgesForNode(hashtag,2,edgeId)
+            edgeId= getEdgesForNode(hashtag,2,edgeId,color)
+#edgeId= getEdgesForNode(hashtag,2,edgeId)
+print(str(allEdges))
 # write to file
-file_object  = open("C:/xampp/htdocs/SigmaJS/data.json", "w")
+file_object  = open("C:/xampp/htdocs/SigmaJS/data3.json", "w")
 file_object.write("{\"nodes\":" + json.dumps(allNodes)+",\"edges\":"+json.dumps(allEdges)+"}");
