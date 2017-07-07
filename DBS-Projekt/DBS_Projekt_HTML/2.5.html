@@ -1,0 +1,44 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <script language="javascript" type="text/javascript" src="js/jquery.js"></script>
+    <script language="javascript" type="text/javascript" src="js/jquery.flot.js"></script>
+	<script language="javascript" type="text/javascript" src="js/jquery.flot.time.js"></script>	
+ </head>
+<body>
+<h1>Vorkommen von "#Trump2016" in der Timeline</h1>
+<script language="javascript" type="text/javascript">  
+$(document).ready(function(){
+    $.getJSON("data/data5.json", function(json) {
+       //succes - data loaded, now use plot:
+           var plotarea = $("#placeholder");
+           var dataBar=json.dataBar;
+			
+			
+			var data = [
+				{
+					data: dataBar,
+					color: '#409628',
+					label:'Hashtags',
+					bars: {show: true, align:'center', barWidth:0.3}
+				}    
+			];
+
+
+			var options = {
+						xaxis: { 
+							mode: "time",
+							minTickSize: [1, "day"],
+							timeformat: "%y-%m-%d" }
+						};
+
+			$.plot(plotarea, data, options);
+              
+    });
+});
+
+</script>       
+    <div id="placeholder" style="width:1300px;height:300px;"></div>
+</body>
+</html>
